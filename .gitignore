@@ -1,2 +1,5 @@
 # IDE-related
 .idea/
+
+# OS-related
+.DS_Store

@@ -1,110 +1,127 @@
+// scanner.go provides the token and scanning logic for user inputs while the
+//game is running.
+
 package input
 
 import (
-	"bufio"
-	"bytes"
-	"io"
+	"strings"
 	"unicode"
+	"unicode/utf8"
 )
-
-// scanner.go provides the token and scanning logic for user inputs while the
-//game is running.
 
 // Token defines a token spawned from the Scanner
 type Token uint
 
 const (
-	SELECTION Token = iota // alias to a keyword
-
-	INDEX // an index value either for the Pwner or Hex Dump
-
-	ILLEGAL
-	EOS // end of a statement
+	EOFRune        rune  = -1
+	SelectionToken Token = iota // alias to a keyword
+	IndexToken                  // an index value either for the Pwner or Hex Dump
+	IllegalToken
+	EndOfStatementToken // end of a statement
 )
 
-// Scanner provides lexical analysis logic.
+// Scanner provides lexical analysis logic for user input.
 type Scanner struct {
-	r *bufio.Reader
+	input    string // the string to be lexed
+	position int    // starting and position indices
+	rewind   RuneStack
 }
 
 // NewScanner returns an instance of Scanner.
-func NewScanner(r io.Reader) *Scanner {
-	return &Scanner{bufio.NewReader(r)}
+func NewScanner() *Scanner {
+	return &Scanner{}
 }
 
-// Scan returns the next token and literal value, else an error.
-func (s *Scanner) Scan() (tok Token, lit string) {
-	ch, err := s.read()
-	if err != nil {
-		return EOS, ""
+// Reset resets the fields of the lexer to their zero values with the exception
+// to "input", where we replace it with "new".
+func (s *Scanner) Reset(new string) {
+	s.input = new
+	s.position = 0
+	s.rewind.RemoveAllElements()
+}
+
+// NextToken returns a type-value pair representing the next token scanned in
+// the input string. It ignores any space characters and considers consecutive
+// digits to be a number.
+func (s *Scanner) NextToken() (tok Token, lit string) {
+	r := s.scan()
+
+	if r == EOFRune {
+		return EndOfStatementToken, ""
 	}
-	if unicode.IsSpace(ch) {
+	if unicode.IsSpace(r) {
 		s.scanSpace()
-		ch, err = s.read()
-		// Since we iterated the buffer ignoring space runes, check to make sure
-		// no errors were found.
-		if err != nil {
-			return EOS, ""
+		r = s.scan()
+		if r == EOFRune {
+			return EndOfStatementToken, ""
 		}
 	}
-	if ch == 'p' || ch == 'd' {
-		return SELECTION, string(ch)
-	} else if unicode.IsDigit(ch) {
-		s.unread()
-		return s.scanIndex()
+	lit = string(r)
+	if r == 'p' || r == 'd' {
+		tok = SelectionToken
+	} else if unicode.IsDigit(r) {
+		tok = IndexToken
+		s.unscan()
+		lit = s.scanInteger()
+	} else {
+		tok = IllegalToken
 	}
-	return ILLEGAL, string(ch)
+	return tok, lit
 
 }
 
-// scanSpace consumes the current rune and all adjacent space runes. Since
-// space is irrelevant in this context, we do not return any state.
+func (s *Scanner) scan() rune {
+	var (
+		r    rune
+		size int // essentially the ending index byte for a rune
+	)
+	str := s.input[s.position:]
+	if len(str) == 0 {
+		return EOFRune
+	}
+	r, size = utf8.DecodeRuneInString(str)
+	s.position += size
+	s.rewind.Push(r)
+
+	return r
+}
+
+func (s *Scanner) unscan() {
+	r := s.rewind.Pop()
+	if r > EOFRune {
+		size := utf8.RuneLen(r)
+		s.position -= size
+	}
+}
+
+// scanSpace reads a rune and all subsequent runes until it cannot scan any
+// further runes or if it reaches a non-space character.
 func (s *Scanner) scanSpace() {
-	// Consume subsequent space-related runes until either we reached the end
-	// or we get a non-whitespace character. If we reach either condition, break
-	// from the loop.
-	for {
-		if ch, err := s.read(); err != nil {
-			break
-		} else if !unicode.IsSpace(ch) {
-			s.unread()
+	r := s.scan()
+
+	for r != EOFRune {
+		if !unicode.IsSpace(r) {
+			s.unscan()
 			break
 		}
+		r = s.scan()
 	}
 }
 
-// scanIndex consumes the current rune and all adjacent integer runes.
-func (s *Scanner) scanIndex() (tok Token, lit string) {
-	// Create a buffer and read the current integer rune into it.
-	var buf bytes.Buffer
-	ch, _ := s.read()
-	buf.WriteRune(ch)
+// scanInteger reads a rune and all subsequent runes until it cannot scan
+// any further runes or if we reach a non-digit character. It returns these
+// subsequent digits as a string (i.e. it represents a number).
+func (s *Scanner) scanInteger() string {
+	builder := strings.Builder{}
+	r := s.scan()
 
-	// Consume subsequent integer runes
-	for {
-		if ch, err := s.read(); err != nil {
+	for r != EOFRune {
+		if !unicode.IsDigit(r) {
+			s.unscan() // don't throw away a rune that may be scan later
 			break
-		} else if !unicode.IsDigit(ch) {
-			s.unread()
-			break
-		} else {
-			buf.WriteRune(ch)
 		}
+		builder.WriteRune(r)
+		r = s.scan()
 	}
-	return INDEX, buf.String()
-}
-
-// read returns the next rune from the buffered reader. Returns an error if an
-// error occurs or the end to the buffer has been reached.
-func (s *Scanner) read() (rune, error) {
-	ch, _, err := s.r.ReadRune()
-	if err != nil {
-		return -1, err
-	}
-	return ch, nil
-}
-
-// unread places the previously-read rune back on to the reader.
-func (s *Scanner) unread() {
-	s.r.UnreadRune()
+	return builder.String()
 }
