@@ -2,7 +2,6 @@ package game
 
 import (
 	tl "github.com/JoelOtter/termloop"
-	"portdive/internal"
 	"strconv"
 )
 
@@ -38,12 +37,12 @@ func (ui *UI) Draw(s *tl.Screen) {
 			bg = tl.ColorDefault
 			row := ui.game.Matrix.Get(y)
 			if y == ui.MatrixInd {
-				bg = internal.Hover
+				bg = Hover
 			}
-			if row.Status() == internal.Active {
-				fg = internal.Active
+			if row.Status() == Active {
+				fg = Active
 			} else {
-				fg = internal.Inactive
+				fg = Inactive
 			}
 			for x := 0; x < ui.game.Matrix.Get(y).Len(); x++ {
 				frag := strconv.FormatInt(int64(ui.game.Matrix.Get(y).Get(x)), 10)
@@ -60,14 +59,14 @@ func (ui *UI) Draw(s *tl.Screen) {
 			frag := strconv.FormatInt(int64(ui.game.Pwner.Get(x).Frag()), 10)
 
 			if x == ui.PwnerInd {
-				bg = internal.Hover
+				bg = Hover
 			}
-			if ele.Status() == internal.Active {
-				fg = internal.Active
-			} else if ele.Status() == internal.Inactive {
-				fg = internal.Inactive
+			if ele.Status() == Active {
+				fg = Active
+			} else if ele.Status() == Inactive {
+				fg = Inactive
 			} else {
-				fg = internal.Chosen
+				fg = Chosen
 			}
 			if x != ui.game.Pwner.Len()-1 {
 				frag += " . "

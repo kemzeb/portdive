@@ -1,10 +1,10 @@
 package game
 
 import (
-	tl "github.com/JoelOtter/termloop"
 	"math/rand"
-	"portdive/internal"
 	"time"
+
+	tl "github.com/JoelOtter/termloop"
 )
 
 type Game struct {
@@ -52,7 +52,7 @@ func NewGame(m *[]PortRow) *Game {
 	game.Matrix = NewPortMatrix(*m, game.Pwner)
 	game.UI = NewUI(game)
 	game.Controls = NewControls(game)
-	game.ticker = *time.NewTicker(internal.Duration)
+	game.ticker = *time.NewTicker(Duration)
 	// TODO: Solve cyclic dependency problem with PortMatrix
 	game.Pwner.SetMatrix(game.Matrix)
 	return game
@@ -72,7 +72,7 @@ func (g *Game) Draw(s *tl.Screen) {
 func (g *Game) Start() {
 	g.Key.RandomizeKey(g.Matrix)
 	g.Pwner.Init()
-	g.Pwner.UpdateWithoutRandomization()
+	g.Matrix.Update()
 
 	g.Engine.Screen().AddEntity(g.UI)
 	g.Engine.Screen().AddEntity(g.Controls)
@@ -84,7 +84,7 @@ func (g *Game) DeterminePortMatrixChoice() {
 	if g.UI.MatrixInd == g.Key.ChosenIndex() {
 		g.hasWon = true
 		g.isOver = true
-	} else if g.Matrix.Get(g.UI.MatrixInd).Status() == internal.Inactive {
+	} else if g.Matrix.Get(g.UI.MatrixInd).Status() == Inactive {
 		return
 	} else { // An incorrect active status PortRow was chosen
 		g.hasWon = false
@@ -98,8 +98,8 @@ func (g *Game) DeterminePwnerChoice() {
 	if !chosenEle.Selectable() {
 		return
 	}
-	if chosenEle.Status() == internal.Active {
-		chosenEle.SetStatus(internal.Chosen)
+	if chosenEle.Status() == Active {
+		chosenEle.SetStatus(Chosen)
 	}
 	g.Pwner.UpdateWithoutRandomization()
 	g.Matrix.Update()
@@ -107,7 +107,7 @@ func (g *Game) DeterminePwnerChoice() {
 	// See if the player has chosen all the correct port fragments in the Pwner
 	// device
 	for i := 0; i < g.Pwner.Len(); i++ {
-		if g.Pwner.Get(i).Status() != internal.Chosen {
+		if g.Pwner.Get(i).Status() != Chosen {
 			return
 		}
 	}

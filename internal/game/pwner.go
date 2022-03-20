@@ -3,8 +3,6 @@ package game
 import (
 	tl "github.com/JoelOtter/termloop"
 	"math/rand"
-	"portdive/internal"
-	"sync"
 )
 
 // Element represents an element within the Pwner device.
@@ -22,11 +20,11 @@ func (e *Element) SetStatus(s tl.Attr)  { e.status = s }
 
 // Pwner represents the Pwner device.
 type Pwner struct {
-	frags  []Element
-	matrix *PortMatrix
-	k      *Key
-	seed   *rand.Source // used for randomizing port numbers
-	lock   sync.Mutex
+	frags            []Element
+	matrix           *PortMatrix
+	k                *Key
+	seed             *rand.Source // used for randomizing port numbers
+	availableIndices []int
 }
 
 func NewPwner(k *Key, s *rand.Source) *Pwner {
@@ -46,58 +44,54 @@ func (p Pwner) Get(i int) *Element {
 func (p Pwner) Len() int { return len(p.frags) }
 
 // Init instantiates a slice of Element types with a length = the # of
-//columns in the PortMatrix. It chooses random port fragments in each column...
+// columns in the PortMatrix. It chooses random port fragments in each column
 // for each element in the Pwner.
 func (p *Pwner) Init() {
 	rowLen := p.matrix.Len()
 	colLen := p.matrix.Get(0).Len()
+	p.availableIndices = make([]int, colLen)
 
 	for i := 0; i < colLen; i++ {
-		randomRowIndex := internal.RandomizeInt(*p.seed, 0, rowLen-1)
+		randomRowIndex := RandomizeInt(*p.seed, 0, rowLen-1)
 		randomFrag := p.matrix.Get(randomRowIndex).Get(i)
-		element := Element{randomFrag, false, internal.Inactive}
+		element := Element{randomFrag, false, Inactive}
 		p.frags = append(p.frags, element)
+
+		p.availableIndices[i] = i
 	}
 }
 
 // Update updates the state of the port fragments.
 func (p *Pwner) Update() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	// Determine the random # of Pwner elements that should be replaced
-	replaceLen := internal.RandomizeInt(*p.seed, 0, p.Len()/2)
-	var randPwnerIndex int
-	var excludedPwnerIndicies []int
-
-	// Determine Pwner indices to exclude
-	for i := 0; i < replaceLen; i++ {
-		if p.Get(i).Status() == internal.Chosen {
-			excludedPwnerIndicies = append(excludedPwnerIndicies, i)
+	for i := 0; i < len(p.availableIndices); i++ {
+		// Remove elements from the available list that were chosen
+		if p.Get(p.availableIndices[i]).Status() == Chosen {
+			p.availableIndices = append(p.availableIndices[:i],
+				p.availableIndices[i+1:]...)
 		}
 	}
-
+	// Determine the random # of Pwner elements that should be replaced
+	replaceLen := RandomizeInt(*p.seed, 0, len(p.availableIndices))
 	for i := 0; i < replaceLen; i++ {
-		randPwnerIndex = internal.RandomizeInt(*p.seed, 0, p.Len()-1, excludedPwnerIndicies...)
-		randMatrixRowIndex := internal.RandomizeInt(*p.seed, 0, p.matrix.Len()-1, i)
+		randAvailInd := RandomizeInt(*p.seed, 0, len(p.availableIndices)-1)
+		randMatrixRowIndex := RandomizeInt(*p.seed, 0, p.matrix.Len()-1, i)
 		randRow := p.matrix.Get(randMatrixRowIndex)
-		p.frags[randPwnerIndex].frag = randRow.Get(randPwnerIndex)
+		p.frags[p.availableIndices[randAvailInd]].frag = randRow.Get(p.availableIndices[randAvailInd])
 	}
 
 	// Update the select and status states of each Element. Note that the
 	// Chosen status is not determined here.
 	for i := 0; i < p.Len(); i++ {
-		ele := &p.frags[i]
+		ele := p.Get(i)
 
 		if !p.IsSelectable(i) {
-			ele.SetSelectable(false)
-			ele.SetStatus(internal.Inactive)
-		} else {
-			if ele.Status() == internal.Chosen {
-				ele.SetSelectable(false)
-			} else {
-				ele.SetSelectable(true)
-				ele.SetStatus(internal.Active)
+			if ele.Status() == Active {
+				ele.SetStatus(Inactive)
 			}
+			ele.SetSelectable(false)
+		} else {
+			ele.SetSelectable(true)
+			ele.SetStatus(Active)
 		}
 	}
 }
@@ -105,22 +99,19 @@ func (p *Pwner) Update() {
 // UpdateWithoutRandomization updates the Pwner device without randomizing its
 // port fragments
 func (p *Pwner) UpdateWithoutRandomization() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
 	// Update the select and status states of each Element. Note that the
 	// Chosen status is not determined here.
 	for i := 0; i < p.Len(); i++ {
 		ele := p.Get(i)
 
 		if !p.IsSelectable(i) {
-			if ele.Status() == internal.Active {
-				ele.SetStatus(internal.Inactive)
+			if ele.Status() == Active {
+				ele.SetStatus(Inactive)
 			}
 			ele.SetSelectable(false)
-
 		} else {
 			ele.SetSelectable(true)
-			ele.SetStatus(internal.Active)
+			ele.SetStatus(Active)
 		}
 	}
 }
@@ -130,7 +121,7 @@ func (p *Pwner) UpdateWithoutRandomization() {
 // maps to the same port fragment in the Key.
 func (p Pwner) IsSelectable(i int) bool {
 	ele := p.Get(i)
-	return ele.Frag() == p.k.Get(i) && ele.Status() != internal.Chosen
+	return ele.Frag() == p.k.Get(i) && ele.Status() != Chosen
 }
 
 // TODO: Find a better solution to solving cyclic dependency with PortMatrix

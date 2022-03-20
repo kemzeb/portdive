@@ -2,8 +2,6 @@ package game
 
 import (
 	tl "github.com/JoelOtter/termloop"
-	"portdive/internal"
-	"sync"
 )
 
 // PortRow represents a row within the PortMatrix.
@@ -15,7 +13,7 @@ type PortRow struct {
 
 // NewPortRow instantiates a PortRow.
 func NewPortRow(f []int) *PortRow {
-	return &PortRow{frags: f, selectable: true, status: internal.Active}
+	return &PortRow{frags: f, selectable: true, status: Active}
 }
 
 // Get returns the port fragment found at the given index.
@@ -38,7 +36,6 @@ func (r *PortRow) SetStatus(s tl.Attr)  { r.status = s }
 type PortMatrix struct {
 	rows  []PortRow
 	pwner *Pwner
-	lock  sync.Mutex
 }
 
 // NewPortMatrix instantiates a PortMatrix
@@ -58,16 +55,14 @@ func (m PortMatrix) Len() int {
 
 // Update updates the state of the rows in the PortMatrix.
 func (m *PortMatrix) Update() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
 	for i := 0; i < m.Len(); i++ {
 		row := m.Get(i)
 		if m.IsSelectable(i) {
 			row.SetSelectable(true)
-			row.SetStatus(internal.Active)
+			row.SetStatus(Active)
 		} else {
 			row.SetSelectable(false)
-			row.SetStatus(internal.Inactive)
+			row.SetStatus(Inactive)
 		}
 	}
 }
@@ -83,7 +78,7 @@ func (m PortMatrix) IsSelectable(i int) bool {
 	for j := 0; j < colLen; j++ {
 		pwnerEle := m.pwner.Get(j)
 
-		if pwnerEle.Status() == internal.Chosen && pwnerEle.Frag() != row.Get(j) {
+		if pwnerEle.Status() == Chosen && pwnerEle.Frag() != row.Get(j) {
 			return false
 		}
 	}
