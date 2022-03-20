@@ -1,10 +1,10 @@
 // util.go provides constant values and functions that are used across package
 // game.
 
-package game
+package internal
 
 import (
-	"github.com/pterm/pterm"
+	tl "github.com/JoelOtter/termloop"
 	"math/rand"
 	"time"
 )
@@ -16,12 +16,13 @@ const (
 	MaxHexDumpColumns = 6
 )
 
-// Colors used to represent the status of hex dump rows and of the p hex
+// Colors used to represent the status of hex dump rows and of the Pwner hex
 // values
 const (
-	Inactive = pterm.FgDarkGray
-	Active   = pterm.FgLightGreen
-	Chosen   = pterm.FgLightWhite
+	Inactive = tl.ColorDefault
+	Active   = tl.ColorGreen
+	Chosen   = tl.ColorYellow
+	Hover    = tl.ColorMagenta
 )
 
 // RandomizeInt generates a random integer value given minimum and maximum

@@ -1,140 +1,116 @@
 package game
 
 import (
-	"fmt"
-	"github.com/pterm/pterm"
+	tl "github.com/JoelOtter/termloop"
 	"math/rand"
-	"portdive/internal/input"
-	"strings"
+	"portdive/internal"
 	"time"
 )
 
 type Game struct {
-	m      *PortMatrix
-	p      *Pwner
-	k      *Key
-	h      input.InHandler
-	input  chan *input.InHandlerResult
-	seed   *rand.Source
+	Engine   *tl.Game
+	Options  Options
+	Controls *Controls
+	Key      *Key
+	Pwner    *Pwner
+	Matrix   *PortMatrix
+	UI       *UI
+	seed     *rand.Source
+	// overFlag informs other instances depending on Game that the game has
+	// ended.
+	isOver bool
 	hasWon bool
+	ticker time.Ticker
 }
 
-func NewGame(m *[]PortRow, s *rand.Source) *Game {
-	key := NewKey(s)
-	pwner := NewPwner(key, s)
-	matrix := NewPortMatrix(*m, pwner)
-	pwner.SetMatrix(matrix) // TODO: Solve cyclic dependency problem with PortMatrix
-	in := make(chan *input.InHandlerResult)
-	return &Game{
-		m:     matrix,
-		p:     pwner,
-		k:     key,
-		h:     *input.NewInHandler(in),
-		input: in,
-		seed:  s}
+func (g *Game) IsOver() bool {
+	return g.isOver
 }
 
-func (g *Game) StartGame() {
-	var (
-		message []string
-		err     error
-	)
-
-	g.k.RandomizeKey(g.m)
-	g.p.Init()
-	g.p.UpdateWithoutRandomization()
-
-	area, _ := pterm.DefaultArea.WithCenter().Start()
-
-	finish := make(chan bool)
-	go g.h.Handle(finish)
-
-	g.printGame(area)
-	for !g.IsGameOver() {
-		message = nil
-
-		select {
-		case result := <-g.input:
-			if result.Err != nil {
-				message = append(message, result.Err.Error())
-			} else {
-				if result.Selection.Type == input.MatrixSelection {
-					err = g.determinePortMatrixChoice(*result)
-				} else {
-					err = g.determinePwnerChoice(*result)
-				}
-				message = append(message, err.Error())
-			}
-			g.m.Update()
-			g.p.UpdateWithoutRandomization()
-		case <-time.After(Duration):
-			g.m.Update()
-			g.p.Update()
-
-		}
-		g.printGame(area, message...)
-	}
-	finish <- true // tell the input handler the game has finished
-
-}
-
-// IsGameOver determines if the game has ended. It will also set the hasWon
-// field to true if the game was won. As of now, there are 3 ways
-// of triggering a game over:
-//
-// 1. The player chooses a correct row in the PortMatrix.
-//
-// 2. The player chooses an incorrect row in the PortMatrix.
-//
-// 3. The player has the status of each PwnerElment in the Pwner as Chosen.
-func (g Game) IsGameOver() bool {
+func (g *Game) HasWon() bool {
 	return g.hasWon
 }
 
-// determinePortMatrixChoice determines if a choice a player made is valid or
-// not. It will then determine
-func (g *Game) determinePortMatrixChoice(res input.InHandlerResult) error {
-	return nil
+type Options struct {
+	// width of the game world in terms of console pixels (cells)
+	width int
+	// height of the game world in terms of console pixels (cells)
+	height int
+	// fps sets the framerate for tl.Screen
+	fps int
 }
 
-func (g *Game) determinePwnerChoice(res input.InHandlerResult) error {
-	return nil
+func NewGame(m *[]PortRow) *Game {
+	game := &Game{}
+	seed := rand.NewSource(time.Now().UnixNano())
+
+	game.Engine = tl.NewGame()
+	tw, th := game.Engine.Screen().Size()
+	game.Options = Options{tw, th, 30}
+	game.Key = NewKey(&seed)
+	game.Pwner = NewPwner(game.Key, &seed)
+	game.Matrix = NewPortMatrix(*m, game.Pwner)
+	game.UI = NewUI(game)
+	game.Controls = NewControls(game)
+	game.ticker = *time.NewTicker(internal.Duration)
+	// TODO: Solve cyclic dependency problem with PortMatrix
+	game.Pwner.SetMatrix(game.Matrix)
+	return game
 }
 
-func (g Game) printGame(area *pterm.AreaPrinter, messages ...string) {
-	var sb strings.Builder
+func (g *Game) Tick(e tl.Event) {}
 
-	for i := 0; i < g.m.Len(); i++ {
-		row := g.m.Get(i)
-		rowColor := row.Status()
-		// Display the PortMatrix
-		sb.WriteString(fmt.Sprintf("%-6d ", i))
-		for j := 0; j < row.Len(); j++ {
-			frag := row.Get(j)
-			coloredFrag := rowColor.Sprint(frag)
-			sb.WriteString(coloredFrag)
-			if j+1 == row.Len() {
-				break
-			}
-			sb.WriteString(" . ")
+func (g *Game) Draw(s *tl.Screen) {
+	select {
+	case <-g.ticker.C:
+		g.Pwner.Update()
+		g.Matrix.Update()
+	default:
+	}
+}
+
+func (g *Game) Start() {
+	g.Key.RandomizeKey(g.Matrix)
+	g.Pwner.Init()
+	g.Pwner.UpdateWithoutRandomization()
+
+	g.Engine.Screen().AddEntity(g.UI)
+	g.Engine.Screen().AddEntity(g.Controls)
+	g.Engine.Screen().AddEntity(g)
+	g.Engine.Start()
+}
+
+func (g *Game) DeterminePortMatrixChoice() {
+	if g.UI.MatrixInd == g.Key.ChosenIndex() {
+		g.hasWon = true
+		g.isOver = true
+	} else if g.Matrix.Get(g.UI.MatrixInd).Status() == internal.Inactive {
+		return
+	} else { // An incorrect active status PortRow was chosen
+		g.hasWon = false
+		g.isOver = true
+	}
+}
+
+func (g *Game) DeterminePwnerChoice() {
+	chosenEle := g.Pwner.Get(g.UI.PwnerInd)
+
+	if !chosenEle.Selectable() {
+		return
+	}
+	if chosenEle.Status() == internal.Active {
+		chosenEle.SetStatus(internal.Chosen)
+	}
+	g.Pwner.UpdateWithoutRandomization()
+	g.Matrix.Update()
+
+	// See if the player has chosen all the correct port fragments in the Pwner
+	// device
+	for i := 0; i < g.Pwner.Len(); i++ {
+		if g.Pwner.Get(i).Status() != internal.Chosen {
+			return
 		}
-		sb.WriteString("\n")
 	}
-	sb.WriteString(fmt.Sprintf("\n%-7s", ""))
-	// Display the Pwner
-	for i := 0; i < g.p.Len(); i++ {
-		element := g.p.Get(i)
-		coloredFrag := element.Status().Sprint(element.Frag())
-		sb.WriteString(coloredFrag)
-		if i+1 == g.p.Len() {
-			break
-		}
-		sb.WriteString(" . ")
-	}
-	sb.WriteString("\n")
-	// Display any error messages
-	for _, msg := range messages {
-		sb.WriteString(pterm.FgYellow.Sprint(msg + "\n"))
-	}
-	area.Update(sb.String())
+	g.hasWon = true
+	g.isOver = true
 }

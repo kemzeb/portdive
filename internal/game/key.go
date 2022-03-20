@@ -2,11 +2,12 @@ package game
 
 import (
 	"math/rand"
+	"portdive/internal"
 )
 
-// Key represents a row within the hex dump that represents the key.
+// Key represents a row within the hex dump that represents the Key.
 type Key struct {
-	fragPtrs    []*int       // the port fragment values that make up the key
+	fragPtrs    []int        // the port fragment values that make up the Key
 	chosenIndex int          // the index of a row in PortMatrix that was chosen
 	seed        *rand.Source // used for choosing a random PortRow in PortMatrix
 }
@@ -17,18 +18,18 @@ func NewKey(s *rand.Source) *Key {
 }
 
 // Get returns a hex value within the Key.
-func (k Key) Get(i int) int { return *k.fragPtrs[i] }
+func (k Key) Get(i int) int { return k.fragPtrs[i] }
 
 // RandomizeKey chooses a random row within the hex dump. This implementation is
 // bound to change.
 func (k *Key) RandomizeKey(dump *PortMatrix) {
 	rowLen := dump.Len()
 	colLen := dump.Get(0).Len()
-	randomRowIndex := RandomizeInt(*k.seed, 0, rowLen-1)
+	k.chosenIndex = internal.RandomizeInt(*k.seed, 0, rowLen-1)
 
 	for i := 0; i < colLen; i++ {
-		row := dump.Get(randomRowIndex)
-		k.fragPtrs = append(k.fragPtrs, &row.frags[i])
+		row := dump.Get(k.chosenIndex)
+		k.fragPtrs = append(k.fragPtrs, row.Get(i))
 	}
 }
 
