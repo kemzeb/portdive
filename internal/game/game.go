@@ -15,12 +15,9 @@ type Game struct {
 	Pwner    *Pwner
 	Matrix   *PortMatrix
 	UI       *UI
-	seed     *rand.Source
-	// overFlag informs other instances depending on Game that the game has
-	// ended.
-	isOver bool
-	hasWon bool
-	ticker time.Ticker
+	isOver   bool
+	hasWon   bool
+	ticker   time.Ticker
 }
 
 func (g *Game) IsOver() bool {
