@@ -7,6 +7,14 @@ import (
 	tl "github.com/JoelOtter/termloop"
 )
 
+type GameStatus int
+
+const (
+	IsActive GameStatus = iota
+	HasWon
+	HasLost
+)
+
 type Game struct {
 	Engine   *tl.Game
 	Options  Options
@@ -15,17 +23,12 @@ type Game struct {
 	Pwner    *Pwner
 	Matrix   *PortMatrix
 	UI       *UI
-	isOver   bool
-	hasWon   bool
+	status   GameStatus
 	ticker   time.Ticker
 }
 
-func (g *Game) IsOver() bool {
-	return g.isOver
-}
-
-func (g *Game) HasWon() bool {
-	return g.hasWon
+func (g Game) Status() GameStatus {
+	return g.status
 }
 
 type Options struct {
@@ -79,13 +82,11 @@ func (g *Game) Start() {
 
 func (g *Game) DeterminePortMatrixChoice() {
 	if g.UI.MatrixInd == g.Key.ChosenIndex() {
-		g.hasWon = true
-		g.isOver = true
+		g.status = HasWon
 	} else if g.Matrix.Get(g.UI.MatrixInd).Status() == Inactive {
 		return
-	} else { // An incorrect active status PortRow was chosen
-		g.hasWon = false
-		g.isOver = true
+	} else { // An incorrect active status PortRow was chosen.
+		g.status = HasLost
 	}
 }
 
@@ -102,12 +103,12 @@ func (g *Game) DeterminePwnerChoice() {
 	g.Matrix.Update()
 
 	// See if the player has chosen all the correct port fragments in the Pwner
-	// device
+	// device.
 	for i := 0; i < g.Pwner.Len(); i++ {
 		if g.Pwner.Get(i).Status() != Chosen {
 			return
 		}
 	}
-	g.hasWon = true
-	g.isOver = true
+
+	g.status = HasWon
 }

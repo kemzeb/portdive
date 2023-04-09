@@ -15,8 +15,7 @@ func NewControls(game *Game) *Controls {
 }
 
 func (c *Controls) Tick(e tl.Event) {
-	if !c.g.IsOver() {
-		// Handle in-game Controls
+	if c.g.Status() == IsActive {
 		switch e.Key {
 		case tl.KeyCtrlJ:
 			c.MoveUp()

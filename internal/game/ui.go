@@ -1,8 +1,9 @@
 package game
 
 import (
-	tl "github.com/JoelOtter/termloop"
 	"strconv"
+
+	tl "github.com/JoelOtter/termloop"
 )
 
 const (
@@ -27,12 +28,12 @@ func NewUI(game *Game) *UI {
 func (ui *UI) Draw(s *tl.Screen) {
 	var bg, fg tl.Attr
 
-	if !ui.game.IsOver() {
-		// represents the current y value we should be drawing to, as well as an
-		// index for the PortMatrix
+	if ui.game.Status() == IsActive {
+		// y represents the current y value we should be drawing to, as well as an
+		// index into PortMatrix.
 		y := 0
 
-		// Draw the port Matrix rows
+		// Draw the port Matrix rows.
 		for ; y < ui.game.Matrix.Len(); y++ {
 			bg = tl.ColorDefault
 			row := ui.game.Matrix.Get(y)
@@ -52,7 +53,7 @@ func (ui *UI) Draw(s *tl.Screen) {
 				tl.NewText(xOffset*x, yOffset+y, frag, fg, bg).Draw(s)
 			}
 		}
-		// Draw the Pwner elements
+		// Draw the Pwner elements.
 		for x := 0; x < ui.game.Pwner.Len(); x++ {
 			bg = tl.ColorDefault
 			ele := ui.game.Pwner.Get(x)
@@ -73,11 +74,9 @@ func (ui *UI) Draw(s *tl.Screen) {
 			}
 			tl.NewText(xOffset*x, yOffset+1+y, frag, fg, bg).Draw(s)
 		}
+	} else if ui.game.Status() == HasWon {
+		tl.NewText(xOffset, yOffset, "You have won", fg, bg).Draw(s)
 	} else {
-		if ui.game.HasWon() {
-			tl.NewText(xOffset, yOffset, "You have won", fg, bg).Draw(s)
-		} else {
-			tl.NewText(xOffset, yOffset, "You have lost", fg, bg).Draw(s)
-		}
+		tl.NewText(xOffset, yOffset, "You have lost", fg, bg).Draw(s)
 	}
 }
