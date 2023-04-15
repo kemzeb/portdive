@@ -80,3 +80,35 @@ func (ui *UI) Draw(s *tl.Screen) {
 		tl.NewText(xOffset, yOffset, "You have lost", fg, bg).Draw(s)
 	}
 }
+
+// MoveUp moves the PortMatrix cursor up. If it hits the topmost port address,
+// it will not move.
+func (ui *UI) MoveUp() {
+	if !(ui.MatrixInd == 0) {
+		ui.MatrixInd--
+	}
+}
+
+// MoveDown moves the PortMatrix cursor down. If it hits the bottommost
+// port address, it will not move.
+func (ui *UI) MoveDown() {
+	if !(ui.MatrixInd == ui.game.Matrix.Len()-1) {
+		ui.MatrixInd++
+	}
+}
+
+// MoveRight moves the Pwner cursor to the right. If it hits the rightmost
+// port fragment, it will not move.
+func (ui *UI) MoveRight() {
+	if !(ui.PwnerInd == ui.game.Pwner.Len()-1) {
+		ui.PwnerInd++
+	}
+}
+
+// MoveLeft moves the Pwner cursor to the left. If it hits the rightmost
+// port fragment, it will not move.
+func (ui *UI) MoveLeft() {
+	if !(ui.PwnerInd == 0) {
+		ui.PwnerInd--
+	}
+}

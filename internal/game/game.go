@@ -80,6 +80,22 @@ func (g *Game) Start() {
 	g.Engine.Start()
 }
 
+func (g *Game) MoveUp() {
+	g.UI.MoveUp()
+}
+
+func (g *Game) MoveDown() {
+	g.UI.MoveDown()
+}
+
+func (g *Game) MoveRight() {
+	g.UI.MoveRight()
+}
+
+func (g *Game) MoveLeft() {
+	g.UI.MoveLeft()
+}
+
 func (g *Game) DeterminePortMatrixChoice() {
 	if g.UI.MatrixInd == g.Key.ChosenIndex() {
 		g.status = HasWon
